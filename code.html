@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>:root{color-scheme:light}body{margin:0}[hidden]{display:none!important}</style>
+<title>Blueprint to Bytes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout: one column, a top-down floor plan as the centerpiece, controls and status beneath it. */
+:root {
+  --paper: #e8edef;
+  --paper-2: #dde4e7;
+  --ink: #1f2a30;
+  --ink-soft: #55656e;
+  --line: #9fb0b8;
+  --blue: #2c5d8c;
+  --blue-ink: #ffffff;
+  --alert: #c4372c;
+  --gold: #f0b429;
+  --ok: #2f7d5b;
+  --font-display: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #161d22;
+    --paper-2: #1e282e;
+    --ink: #e6edf0;
+    --ink-soft: #9fb0b8;
+    --line: #3b4a53;
+    --blue: #6aa5d8;
+    --blue-ink: #0f171c;
+    --alert: #ff6b5e;
+    --gold: #f5c04a;
+    --ok: #5fc79a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #161d22;
+  --paper-2: #1e282e;
+  --ink: #e6edf0;
+  --ink-soft: #9fb0b8;
+  --line: #3b4a53;
+  --blue: #6aa5d8;
+  --blue-ink: #0f171c;
+  --alert: #ff6b5e;
+  --gold: #f5c04a;
+  --ok: #5fc79a;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--line) 40%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--line) 40%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.55;
+  padding-inline: 16px;
+  padding-block: 28px 56px;
+}
+main { max-width: 640px; margin-inline: auto; }
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-wrap: balance;
+}
+.screen { display: none; }
+.screen.active { display: block; }
+.lede { font-size: 1.12rem; max-width: 52ch; margin: 14px 0 22px; }
+h1 { font-size: clamp(2.4rem, 9vw, 3.8rem); }
+.sheet { background: var(--paper-2); border: 1.5px solid var(--ink); padding: 16px 18px; margin: 0 0 22px; }
+.sheet h3 { font-size: 1.05rem; margin-bottom: 8px; }
+.sheet p { margin: 0 0 8px; max-width: 58ch; }
+.sheet p:last-child { margin-bottom: 0; }
+.route-line { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; margin: 0 0 22px; font-family: var(--font-display); font-weight: 700; }
+.route-line i { border-top: 3px dashed var(--blue); height: 0; }
+.route-line span { border: 1.5px solid var(--ink); background: var(--paper-2); padding: 6px 10px; }
+button {
+  font: inherit;
+  cursor: pointer;
+  color: var(--ink);
+  background: transparent;
+  border: 1.5px solid var(--ink);
+  padding: 9px 16px;
+  min-height: 44px;
+  touch-action: manipulation;
+}
+button:hover:not(:disabled) { background: var(--paper-2); }
+button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.primary { background: var(--blue); color: var(--blue-ink); border-color: var(--blue); font-weight: 500; }
+button.primary:hover:not(:disabled) { background: var(--blue); filter: brightness(1.08); }
+.playhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.playhead h2 { font-size: 1.5rem; }
+.playhead span { color: var(--ink-soft); font-size: 0.95rem; }
+.board {
+  display: grid;
+  grid-template-columns: repeat(15, 1fr);
+  width: 100%;
+  border: 2px solid var(--ink);
+  background: var(--paper);
+  margin-bottom: 14px;
+}
+.board.looking { background: color-mix(in srgb, var(--blue) 14%, var(--paper)); }
+.cell {
+  aspect-ratio: 1;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  display: grid;
+  place-items: center;
+  font-size: clamp(0.6rem, 2.6vw, 1rem);
+  line-height: 1;
+  position: relative;
+}
+.board.looking .cell { border-color: color-mix(in srgb, var(--blue) 40%, transparent); }
+.cell.wall {
+  background-color: var(--ink);
+  background-image: repeating-linear-gradient(45deg, transparent 0 4px, rgba(255, 255, 255, 0.13) 4px 5px);
+}
+.cell.hid { background: transparent; border: 1.5px dashed var(--blue); }
+.cell.barrier {
+  background-image: repeating-linear-gradient(135deg, transparent 0 4px, var(--alert) 4px 6px);
+  border-color: var(--alert);
+}
+.cell.cleared { background: color-mix(in srgb, var(--blue) 20%, var(--paper)); }
+.cell.start { background: color-mix(in srgb, var(--ink) 8%, var(--paper)); }
+.cell.studio { background: color-mix(in srgb, var(--gold) 28%, var(--paper)); }
+.cell.code { background: color-mix(in srgb, var(--ok) 28%, var(--paper)); color: var(--ok); font-weight: 700; }
+.cell.pick { background: var(--gold); border: 2px solid var(--ink); color: #1f2a30; font-weight: 700; }
+.cell.me::after {
+  content: "";
+  width: 62%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--blue);
+  border: 2px solid var(--ink);
+  z-index: 2;
+  position: absolute;
+}
+.controls { display: grid; grid-template-columns: auto 1fr; gap: 16px 20px; align-items: start; margin-bottom: 14px; }
+.dpad { display: grid; grid-template-columns: repeat(3, 52px); grid-template-rows: repeat(2, 52px); gap: 6px; }
+.dpad button { padding: 0; min-height: 0; font-size: 1.3rem; }
+.dpad .up { grid-column: 2; grid-row: 1; }
+.dpad .left { grid-column: 1; grid-row: 2; }
+.dpad .down { grid-column: 2; grid-row: 2; }
+.dpad .right { grid-column: 3; grid-row: 2; }
+.side { display: grid; gap: 10px; min-width: 0; }
+.look[aria-pressed="true"] { background: var(--blue); color: var(--blue-ink); border-color: var(--blue); }
+.hint { color: var(--ink-soft); font-size: 0.92rem; margin: 0; }
+.tray-label { font-family: var(--font-display); font-weight: 700; margin: 0 0 8px; }
+.tray { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 14px; }
+.tray button { display: grid; gap: 2px; justify-items: center; padding: 8px 6px; min-height: 64px; min-width: 0; }
+.tray .g { font-size: 1.15rem; line-height: 1; font-weight: 700; }
+.tray .n { font-size: 0.85rem; }
+.tray button.empty { border-style: dashed; border-color: var(--line); color: var(--ink-soft); }
+.tray button.have { background: var(--paper-2); }
+.status { min-height: 3.8em; margin: 0; padding: 10px 14px; border-left: 4px solid var(--line); background: var(--paper-2); max-width: 62ch; }
+.status.bad { border-color: var(--alert); }
+.status.good { border-color: var(--ok); }
+.reflect { background: var(--paper-2); border: 1.5px solid var(--ink); padding: 22px 20px; margin: 22px 0; }
+.reflect h2 { font-size: 1.7rem; margin-bottom: 14px; }
+.reflect p { max-width: 58ch; margin: 0 0 14px; }
+.reflect .todo { color: var(--ink-soft); border-left: 3px solid var(--line); padding-left: 12px; }
+.recap { display: grid; gap: 8px; margin: 0 0 22px; padding: 0; list-style: none; }
+.recap li { display: grid; grid-template-columns: 9rem 1fr; gap: 10px; }
+.recap b { font-family: var(--font-display); }
+.prompt { border-left: 4px solid var(--blue); background: var(--paper-2); padding: 12px 16px; margin: 14px 0 6px; }
+.prompt h3 { font-size: 1rem; margin-bottom: 4px; }
+.prompt p { margin: 0; max-width: 58ch; }
+.slotbox { display: grid; gap: 6px; min-width: 0; align-content: start; }
+.tray button.about { display: block; min-height: 36px; padding: 4px 8px; font-size: 0.85rem; }
+button.nudge { border-color: var(--blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 30%, transparent); }
+.about-panel { background: var(--paper-2); border: 1.5px solid var(--ink); padding: 16px 18px; margin: 0 0 14px; }
+.about-panel h3 { font-size: 1.05rem; margin-bottom: 8px; }
+.about-panel p { margin: 0 0 10px; max-width: 58ch; }
+.about-panel a { color: var(--blue); }
+@media (max-width: 460px) {
+  .recap li { grid-template-columns: 1fr; gap: 0; }
+  .route-line { grid-template-columns: 1fr; }
+  .route-line i { display: none; }
+  .route-line span { text-align: center; }
+  .controls { grid-template-columns: 1fr; justify-items: center; }
+  .side { width: 100%; }
+}
+</style>
+</head>
+<body>
+<main>
+
+<section id="intro" class="screen active" aria-labelledby="introTitle">
+  <h1 id="introTitle">Blueprint to Bytes</h1>
+  <div class="prompt">
+    <h3>The prompt</h3>
+    <p>Describe a moment when you had to be resourceful. How did you navigate constraints, and what did it reveal about your creativity or values?</p>
+  </div>
+  <p class="lede">You started learning to code while still studying architecture. There was no marked route, only whatever you could find. Get from the drafting table to the code.</p>
+  <div class="route-line" aria-hidden="true"><span>Architecture</span><i></i><span>Code</span></div>
+  <div class="sheet">
+    <h3>How to play</h3>
+    <p>Walk the map in any direction. Obstacles block the main corridor. The sources that clear them are off to the sides, and not every way in is obvious.</p>
+    <p>Stand next to an obstacle and pick the source that fits. If the way in is closed, look again.</p>
+  </div>
+  <button class="primary" id="startBtn">Start walking</button>
+</section>
+
+<section id="play" class="screen" aria-labelledby="playTitle">
+  <div class="playhead"><h2 id="playTitle">The route</h2><span id="found">0 of 3 sources</span></div>
+  <div class="board" id="board" role="img" aria-label="Top-down floor plan of the route from the drafting table to the code door"></div>
+  <div class="controls">
+    <div class="dpad" id="dpad">
+      <button class="up" data-dir="up" aria-label="Walk up">&#8593;</button>
+      <button class="left" data-dir="left" aria-label="Walk left">&#8592;</button>
+      <button class="down" data-dir="down" aria-label="Walk down">&#8595;</button>
+      <button class="right" data-dir="right" aria-label="Walk right">&#8594;</button>
+    </div>
+    <div class="side">
+      <button class="look" id="lookBtn" aria-pressed="false">Look again</button>
+      <button id="hintBtn">Hint</button>
+      <p class="hint">Keys: arrows or WASD to walk, R to look again, H for a hint, 1 2 3 to use a source.</p>
+    </div>
+  </div>
+  <p class="tray-label">Sources</p>
+  <div class="tray" id="tray"></div>
+  <div class="about-panel" id="aboutPanel" hidden></div>
+  <p class="status" id="status" role="status" aria-live="polite">Walk the corridor to the right.</p>
+</section>
+
+<section id="end" class="screen" aria-labelledby="endTitle">
+  <h2 id="endTitle" style="font-size:2rem;margin-bottom:14px">You chose the code</h2>
+  <ul class="recap" id="recap"></ul>
+  <div class="prompt">
+    <h3>The prompt</h3>
+    <p>Describe a moment when you had to be resourceful. How did you navigate constraints, and what did it reveal about your creativity or values?</p>
+  </div>
+  <div class="reflect">
+    <h2>What it revealed</h2>
+    <p class="todo">Draft built from your own answers. Rewrite it in your voice before you submit.</p>
+    <p>I started learning to code while I was still studying architecture, which meant I had to find my own way in. I used whatever I could find: freeCodeCamp, YouTube videos, and a lot of practice.</p>
+    <p>Architecture gave me a creative mindset for solving problems. It taught me to look at things in a different way and to not be satisfied with the first solution, which is how I kept finding another way in when the obvious one was closed.</p>
+    <p>It clicked when I realized I would rather code than draw buildings. [One sentence on what that says about what you value.]</p>
+  </div>
+  <button id="againBtn">Play again</button>
+</section>
+
+</main>
+
+<script>
+(function () {
+  var GRID = [
+    "###############",
+    "##a######.h.c##",
+    "##.##.###.###G#",
+    "##.##.###.###.#",
+    "S...1...2...3.#",
+    "###.##.######.#",
+    "###.##.h.b###E#",
+    "###.##.########",
+    "###############"
+  ];
+  var ROWS = GRID.length;
+  var COLS = GRID[0].length;
+
+  var SOURCES = {
+    a: {
+      id: "fcc", name: "freeCodeCamp", glyph: "</>",
+      summary: "Made code readable, one small lesson at a time.",
+      about: "A free nonprofit coding curriculum. You work through interactive lessons in the browser, then build projects.",
+      helped: "It helped you read code.",
+      url: "https://www.freecodecamp.org", site: "freecodecamp.org"
+    },
+    b: {
+      id: "yt", name: "YouTube", glyph: "▶",
+      summary: "Another way to learn the same thing.",
+      about: "Free video tutorials and walkthroughs. You can watch someone work through a problem, pause, and rewind.",
+      helped: "Videos gave you another way to learn the same thing.",
+      url: "https://www.youtube.com", site: "youtube.com"
+    },
+    c: {
+      id: "practice", name: "Practice", glyph: "↻",
+      summary: "Turned what you learned into something you could do.",
+      about: "Writing code yourself, again and again, on small problems first and then on bigger ones.",
+      helped: "Practice turned what you learned into something you could do.",
+      url: "", site: ""
+    }
+  };
+
+  var HINTS = {
+    fcc: [
+      "Start with what teaches you to read code. It is not on the corridor itself.",
+      "Look for a passage that branches north, close to where you start.",
+      "Walk right two steps, then go up the passage to its end."
+    ],
+    use1: [
+      "A source only works when you are standing next to an obstacle.",
+      "Go back to the corridor and walk up to the first hatched block.",
+      "Stand directly left of the first hatched block, then choose freeCodeCamp from the tray."
+    ],
+    yt: [
+      "The next source is out of reach by the obvious route. Some walls are not what they seem.",
+      "Past the first obstacle, a passage leads south. Follow it down and try the wall beside you.",
+      "Take the south passage at the second cell past the first obstacle. Go down two cells, press Look again, and walk right through the dashed door."
+    ],
+    use2: [
+      "Same idea as before. Stand next to the obstacle, then choose the source.",
+      "Return to the corridor and walk up to the second hatched block.",
+      "Stand directly left of the second hatched block, then choose YouTube from the tray."
+    ],
+    practice: [
+      "One more source is hidden. Some dead ends are not dead ends.",
+      "Past the second obstacle, a passage leads north. Follow it all the way up.",
+      "Take the north passage right after the second obstacle. At its top, press Look again and walk right through the dashed door."
+    ],
+    use3: [
+      "You have what you need. Find the last obstacle on the corridor.",
+      "Walk up to the third hatched block in the corridor.",
+      "Stand directly left of the third hatched block, then choose Practice from the tray."
+    ],
+    finish: [
+      "The corridor ends at a fork. Two doors, two directions.",
+      "Walk past the last obstacle, then choose between going up and going down.",
+      "Walk past the last obstacle. The pencil door leads up to the studio. The {} door below is the code."
+    ]
+  };
+  var ORDER = ["a", "b", "c"];
+
+  var BARRIERS = {
+    "1": { name: "Unreadable code", needs: "a", solved: "Small lessons turned the wall into lines you could follow, one at a time." },
+    "2": { name: "A bug you cannot explain", needs: "b", solved: "Watching someone else work through it showed you another way to see it." },
+    "3": { name: "Not fluent yet", needs: "c", solved: "Repetition did what reading could not. It started to feel natural." }
+  };
+
+  var DIRS = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] };
+
+  var els = {
+    intro: document.getElementById("intro"),
+    play: document.getElementById("play"),
+    end: document.getElementById("end"),
+    board: document.getElementById("board"),
+    tray: document.getElementById("tray"),
+    status: document.getElementById("status"),
+    found: document.getElementById("found"),
+    recap: document.getElementById("recap"),
+    lookBtn: document.getElementById("lookBtn"),
+    hintBtn: document.getElementById("hintBtn"),
+    about: document.getElementById("aboutPanel"),
+    dpad: document.getElementById("dpad")
+  };
+
+  var state;
+
+  function show(name) {
+    ["intro", "play", "end"].forEach(function (n) { els[n].classList.toggle("active", n === name); });
+    window.scrollTo(0, 0);
+  }
+
+  function setStatus(msg, kind) {
+    els.status.textContent = msg;
+    els.status.className = "status" + (kind ? " " + kind : "");
+  }
+
+  function at(r, c) { return GRID[r].charAt(c); }
+
+  function findStart() {
+    for (var r = 0; r < ROWS; r++) {
+      var c = GRID[r].indexOf("S");
+      if (c !== -1) return [r, c];
+    }
+    return [0, 0];
+  }
+
+  function renderBoard() {
+    var html = "";
+    for (var r = 0; r < ROWS; r++) {
+      for (var c = 0; c < COLS; c++) {
+        var ch = at(r, c), cls = ["cell"], text = "";
+        if (ch === "#") cls.push("wall");
+        else if (ch === "h") cls.push(state.look ? "hid" : "wall");
+        else if (BARRIERS[ch]) cls.push(state.cleared[ch] ? "cleared" : "barrier");
+        else if (SOURCES[ch]) {
+          if (!state.items[ch]) { cls.push("pick"); text = SOURCES[ch].glyph; }
+        }
+        else if (ch === "S") cls.push("start");
+        else if (ch === "G") { cls.push("studio"); text = "✎"; }
+        else if (ch === "E") { cls.push("code"); text = "{}"; }
+        if (state.pos[0] === r && state.pos[1] === c) cls.push("me");
+        html += '<div class="' + cls.join(" ") + '">' + text + "</div>";
+      }
+    }
+    els.board.innerHTML = html;
+    els.board.classList.toggle("looking", state.look);
+  }
+
+  function renderTray() {
+    var html = "";
+    ORDER.forEach(function (k) {
+      var s = SOURCES[k];
+      if (state.items[k]) {
+        html += '<div class="slotbox"><button class="have" data-use="' + k + '" aria-label="Use ' + s.name + '"><span class="g">' + s.glyph + '</span><span class="n">' + s.name + '</span></button><button class="about" data-about="' + k + '" aria-label="About ' + s.name + '">About</button></div>';
+      } else {
+        html += '<div class="slotbox"><button class="empty" disabled aria-label="Source not found yet"><span class="g">?</span><span class="n">Not found</span></button></div>';
+      }
+    });
+    els.tray.innerHTML = html;
+    var n = ORDER.filter(function (k) { return state.items[k]; }).length;
+    els.found.textContent = n + " of 3 sources";
+  }
+
+  function move(dir) {
+    if (state.done) return;
+    state.idle++;
+    if (state.idle >= 30) els.hintBtn.classList.add("nudge");
+    var d = DIRS[dir];
+    var nr = state.pos[0] + d[0], nc = state.pos[1] + d[1];
+    if (nr < 0 || nc < 0 || nr >= ROWS || nc >= COLS) return;
+    var ch = at(nr, nc);
+    if (ch === "#") return;
+    if (ch === "h" && !state.look) {
+      setStatus("The obvious way in is closed. Look again.", "bad");
+      return;
+    }
+    if (BARRIERS[ch] && !state.cleared[ch]) {
+      var b = BARRIERS[ch];
+      setStatus(state.items[b.needs] ? b.name + ". Stand here and choose the source that fits." : b.name + ". You do not have what this needs yet. Try the paths that branch off the corridor.", "bad");
+      return;
+    }
+    if (ch === "G") {
+      setStatus("The studio. You could go back to drawing buildings. Is that where you want to go?");
+      return;
+    }
+    state.pos = [nr, nc];
+    if (SOURCES[ch] && !state.items[ch]) {
+      state.items[ch] = true;
+      state.idle = 0;
+      els.hintBtn.classList.remove("nudge");
+      renderTray();
+      setStatus("You found " + SOURCES[ch].name + ". Take it to something it can clear.", "good");
+    }
+    renderBoard();
+    if (ch === "E") finish();
+  }
+
+  function adjacentBarrier() {
+    var keys = Object.keys(DIRS);
+    for (var i = 0; i < keys.length; i++) {
+      var d = DIRS[keys[i]];
+      var r = state.pos[0] + d[0], c = state.pos[1] + d[1];
+      if (r < 0 || c < 0 || r >= ROWS || c >= COLS) continue;
+      var ch = at(r, c);
+      if (BARRIERS[ch] && !state.cleared[ch]) return ch;
+    }
+    return null;
+  }
+
+  function useSource(k) {
+    if (state.done || !state.items[k]) return;
+    var key = adjacentBarrier();
+    if (!key) {
+      setStatus("Nothing to use " + SOURCES[k].name + " on here. Stand next to an obstacle first.");
+      return;
+    }
+    var b = BARRIERS[key];
+    if (b.needs === k) {
+      state.cleared[key] = true;
+      state.idle = 0;
+      els.hintBtn.classList.remove("nudge");
+      setStatus(b.solved, "good");
+      renderBoard();
+    } else {
+      setStatus(SOURCES[k].name + " does not fit " + b.name.toLowerCase() + ". Try another source.", "bad");
+    }
+  }
+
+  function toggleLook() {
+    if (state.done) return;
+    if (state.look && at(state.pos[0], state.pos[1]) === "h") {
+      setStatus("Stay with the new view until you are through the door.");
+      return;
+    }
+    state.look = !state.look;
+    els.lookBtn.setAttribute("aria-pressed", String(state.look));
+    renderBoard();
+    setStatus(state.look ? "Looking again. Dashed outlines mark routes the first look missed." : "Back to the first look.");
+  }
+
+  function currentGoal() {
+    if (!state.items.a) return "fcc";
+    if (!state.cleared["1"]) return "use1";
+    if (!state.items.b) return "yt";
+    if (!state.cleared["2"]) return "use2";
+    if (!state.items.c) return "practice";
+    if (!state.cleared["3"]) return "use3";
+    return "finish";
+  }
+
+  function useHint() {
+    if (state.done) return;
+    var g = currentGoal();
+    var level = Math.min((state.hints[g] || 0) + 1, 3);
+    state.hints[g] = level;
+    state.idle = 0;
+    els.hintBtn.classList.remove("nudge");
+    setStatus("Hint " + level + " of 3. " + HINTS[g][level - 1]);
+  }
+
+  function closeAbout() {
+    state.about = null;
+    els.about.hidden = true;
+    els.about.innerHTML = "";
+  }
+
+  function showAbout(k) {
+    if (state.about === k) { closeAbout(); return; }
+    var s = SOURCES[k];
+    var html = "<h3>" + s.name + "</h3><p>" + s.about + "</p><p>" + s.helped + "</p>";
+    if (s.url) html += '<p><a href="' + s.url + '" target="_blank" rel="noopener">Visit ' + s.site + "</a></p>";
+    html += '<button data-close>Close</button>';
+    els.about.innerHTML = html;
+    els.about.hidden = false;
+    state.about = k;
+  }
+
+  function finish() {
+    state.done = true;
+    var html = "<li><b>Creative mindset</b><span>Looked again instead of settling for the first solution.</span></li>";
+    ORDER.forEach(function (k) {
+      html += "<li><b>" + SOURCES[k].name + "</b><span>" + SOURCES[k].summary + "</span></li>";
+    });
+    els.recap.innerHTML = html;
+    setStatus("You walked past the studio and chose the code.", "good");
+    setTimeout(function () { show("end"); }, 600);
+  }
+
+  function reset() {
+    state = { pos: findStart(), items: {}, cleared: {}, look: false, done: false, hints: {}, idle: 0, about: null };
+    els.lookBtn.setAttribute("aria-pressed", "false");
+    els.hintBtn.classList.remove("nudge");
+    closeAbout();
+    renderTray();
+    renderBoard();
+    setStatus("Walk the corridor to the right.");
+  }
+
+  document.getElementById("startBtn").addEventListener("click", function () { reset(); show("play"); });
+  document.getElementById("againBtn").addEventListener("click", function () { show("intro"); });
+  els.lookBtn.addEventListener("click", toggleLook);
+  els.hintBtn.addEventListener("click", useHint);
+  els.about.addEventListener("click", function (e) {
+    if (e.target.closest("button[data-close]")) closeAbout();
+  });
+  els.dpad.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-dir]");
+    if (b) move(b.getAttribute("data-dir"));
+  });
+  els.tray.addEventListener("click", function (e) {
+    var about = e.target.closest("button[data-about]");
+    if (about) { showAbout(about.getAttribute("data-about")); return; }
+    var b = e.target.closest("button[data-use]");
+    if (b) useSource(b.getAttribute("data-use"));
+  });
+  document.addEventListener("keydown", function (e) {
+    if (!els.play.classList.contains("active") || !state) return;
+    var map = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", w: "up", s: "down", a: "left", d: "right", W: "up", S: "down", A: "left", D: "right" };
+    if (map[e.key]) { e.preventDefault(); move(map[e.key]); }
+    else if (e.key === "r" || e.key === "R") toggleLook();
+    else if (e.key === "h" || e.key === "H") useHint();
+    else if (e.key >= "1" && e.key <= "3") useSource(ORDER[parseInt(e.key, 10) - 1]);
+  });
+})();
+</script>
+</body>
+</html>
